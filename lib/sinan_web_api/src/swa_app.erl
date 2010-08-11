@@ -93,7 +93,11 @@ stop(_State) ->
 %%--------------------------------------------------------------------
 start_crary() ->
     Port = get_port(),
-    crary:start({{127,0,0,1}, Port}, fun swa_crary_handler:handler/2).
+    Opts = get_socket_opts(),
+    crary:start(
+      {{127,0,0,1}, Port},
+      fun swa_crary_handler:handler/2,
+      [{socket_opts, Opts}]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -106,16 +110,30 @@ start_crary() ->
 %%  </ol>
 %%     If it doesn't find a port in either place it uses its default port.
 %%
+%%   It is also possible to pass raw socket options in the env variable <strong>socket_opts.</strong> This is useful, for example,
+%%   when debugging, to set reuseaddr option so that we can reboot sinan after a crash without having to wait for the socket timeout
+%%   or changing the port. For example:
+%%
+%% `application:set_env(sinan_web_api, socket_opts, [{reuseaddr, true}]),'
+%%
 %% @spec get_port() -> integer()
 %% @end
 %%--------------------------------------------------------------------
 get_port() ->
-    case application:get_env(sinan_web_api, port) of
-        undefined ->
-            ?DEFAULT_PORT;
-        {ok, Port} when is_list(Port) ->
+    case get_option(port, ?DEFAULT_PORT) of
+        Port when is_list(Port) ->
             list_to_integer(Port);
-        {ok, Port} when is_integer(Port) ->
+        Port when is_integer(Port) ->
             Port
     end.
 
+get_socket_opts() ->
+    get_option(socket_opts, []).
+
+get_option(Option, Default) ->
+    case application:get_env(sinan_web_api, Option) of
+	undefined ->
+	    Default;
+	{ok, Value} ->
+	    Value
+    end.
